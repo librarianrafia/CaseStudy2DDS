@@ -9,6 +9,7 @@ This report analyzes existing employee data (CaseStudy2-data.csv) to identify th
 * [PDF](https://github.com/librarianrafia/CaseStudy2DDS/blob/main/DDSCode.pdf)
 * [Video]()
 * [Slides](https://github.com/librarianrafia/CaseStudy2DDS/blob/main/DDSReport.pdf)
-[Shiny App](https://librarianrafia.shinyapps.io/JobAttrition/)
-
+* [Shiny App](https://librarianrafia.shinyapps.io/JobAttrition/)
+* [Predictions Attrition](https://github.com/librarianrafia/CaseStudy2DDS/blob/main/Case2PredictionsMirzaAttrition.csv)
+* [Predictions Salary](https://github.com/librarianrafia/CaseStudy2DDS/blob/main/Case2PredictionsMirzaSalary.csv)
 -Rafia Mirza
