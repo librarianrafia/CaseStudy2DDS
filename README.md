@@ -5,10 +5,10 @@ DDSAnalytics Talent Management Report: Employee Attrition Analysis Introduction:
 This report analyzes existing employee data (CaseStudy2-data.csv) to identify the top factors contributing to attrition.Our evidence-based findings aim to inform strategies for mitigating attrition risks and improving workforce stability.
 
 ## Link to Resources
-Rmd
-HMTL
-Video
-deck
+* Rmd
+* PDG
+* Video
+* Slides
 [Shiny App](https://librarianrafia.shinyapps.io/JobAttrition/)
 
 -Rafia Mirza
