@@ -1,0 +1,489 @@
+---
+title: "DDSAnalytics"
+output:
+  pdf_document: default
+  html_document: default
+date: "2023-12-05"
+editor_options:
+  chunk_output_type: console
+---
+
+#DDSAnalytics Talent Management Report: Employee Attrition Analysis
+Introduction: DDSAnalytics, a leading analytics firm serving Fortune 100 companies, is embarking on a data science initiative to enhance talent management. Talent management encompasses workforce planning, employee development, and reducing attrition. Predicting employee turnover is the first focus area identified by the executive leadership.
+
+This report, prepared by our data science team, analyzes existing employee data (CaseStudy2-data.csv) to identify the top factors contributing to attrition.Our evidence-based findings aim to inform strategies for mitigating attrition risks and improving workforce stability.
+
+```{r}
+
+# Clean the global environment & load libraries
+rm(list = ls())
+
+library(tidyverse)
+library(dplyr)
+library(caret)
+library(e1071)
+library(ggplot2)
+library(ROSE)
+library(car)
+```
+
+#Employee Attrition Analysis: Identifying Top Factors and Model Development: Develop a model with one variable.  Find the accuracy, specificity, sensitivity, using KNN, Naïve Bayes or Linear Regression. 
+
+```{r}
+#Data Reading and Initial Exploration
+data <- read.csv("CaseStudy2-data.csv")
+head(data)
+#View(data)
+str(data)
+summary(data)
+sapply(data, class)
+colSums(is.na(data))
+
+```
+
+
+```{r}
+# Data Preprocessing
+# Converting Attrition to a factor
+data$Attrition <- factor(data$Attrition, levels = c("No", "Yes"))
+str(data$Attrition)
+
+# Identify continuous and categorical variables
+continuous_vars <- c("Age", "DailyRate", "DistanceFromHome", "Education", "HourlyRate", "MonthlyIncome", "MonthlyRate", "NumCompaniesWorked", "PercentSalaryHike", "TotalWorkingYears", "TrainingTimesLastYear", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager")
+
+# Convert categorical variables to factors
+categorical_vars <- c("BusinessTravel", "Department", "EducationField", "Gender", "JobInvolvement", "JobLevel", "JobRole", "JobSatisfaction", "MaritalStatus", "OverTime", "WorkLifeBalance", "YearsSinceLastPromotion")
+
+data[categorical_vars] <- lapply(data[categorical_vars], factor)
+
+str(data[categorical_vars])
+
+# Final structure check
+str(data)
+summary(data)
+
+
+```
+
+#DATA VIZ
+
+```{r}
+
+# Create box plots for continuous variables
+for (var in continuous_vars) {
+  p <- ggplot(data, aes_string(x = "Attrition", y = var)) +
+    geom_boxplot() +
+    labs(title = paste("Attrition by", var), y = var, x = "Attrition") +
+    theme_minimal()
+  print(p)
+}
+
+# Create bar plots for categorical variables
+for (var in categorical_vars) {
+  p <- ggplot(data, aes_string(x = var, fill = "Attrition")) +
+    geom_bar(position = "fill") +
+    labs(title = paste("Attrition by", var), y = "Proportion", x = var) +
+    theme_minimal()
+  print(p)
+}
+
+```
+
+
+```{r}
+# Example: Visualize the relationship between Age and Attrition
+ggplot(data, aes(x = Age, fill = Attrition)) + 
+  geom_histogram(binwidth = 1, position = "dodge") +
+  labs(title = "Attrition by Age", x = "Age", y = "Count") +
+  theme_minimal()
+
+
+ggplot(data, aes(x = JobSatisfaction, fill = Attrition)) + 
+  geom_bar(position = "dodge") +
+  labs(title = "Attrition by Job Satisfaction", x = "Job Satisfaction", y = "Count") +
+  theme_minimal()
+
+ggplot(data, aes(x = Department, fill = Attrition)) + 
+  geom_bar(position = "dodge") +
+  labs(title = "Attrition by Department", x = "Department", y = "Count") +
+  theme_minimal()
+
+ggplot(data, aes(x = BusinessTravel, fill = Attrition)) + 
+  geom_bar(position = "dodge") +
+  labs(title = "Attrition by BusinessTravel", x = "BusinessTravel", y = "Count") +
+  theme_minimal()
+
+ggplot(data, aes(x = EducationField, fill = Attrition)) + 
+  geom_bar(position = "dodge") +
+  labs(title = "Attrition by EducationField", x = "EducationField", y = "Count") +
+  theme_minimal()
+
+ggplot(data, aes(x = Gender, fill = Attrition)) + 
+  geom_bar(position = "dodge") +
+  labs(title = "Attrition by Gender", x = "Gender", y = "Count") +
+  theme_minimal()
+
+ggplot(data, aes(x = JobInvolvement, fill = Attrition)) + 
+  geom_bar(position = "dodge") +
+  labs(title = "Attrition by JobInvolvement", x = "JobInvolvement", y = "Count") +
+  theme_minimal()
+
+ggplot(data, aes(x = JobLevel, fill = Attrition)) + 
+  geom_bar(position = "dodge") +
+  labs(title = "Attrition by JobLevel", x = "JobLevel", y = "Count") +
+  theme_minimal()
+
+ggplot(data, aes(x = JobRole, fill = Attrition)) + 
+  geom_bar(position = "dodge") +
+  labs(title = "Attrition by JobRole", x = "JobRole", y = "Count") +
+  theme_minimal()
+
+ggplot(data, aes(x = JobInvolvement, fill = Attrition)) + 
+  geom_bar(position = "dodge") +
+  labs(title = "Attrition by JobInvolvement", x = "JobInvolvement", y = "Count") +
+  theme_minimal()
+
+ggplot(data, aes(x = MaritalStatus, fill = Attrition)) + 
+  geom_bar(position = "dodge") +
+  labs(title = "Attrition by MaritalStatus", x = "MaritalStatus", y = "Count") +
+  theme_minimal()
+
+ggplot(data, aes(x = OverTime, fill = Attrition)) + 
+  geom_bar(position = "dodge") +
+  labs(title = "Attrition by OverTime", x = "OverTime", y = "Count") +
+  theme_minimal()
+
+```
+
+# Explore Job Role-Specific Trends: Examine trends related to specific job roles, such as variations in job satisfaction.
+
+```{r}
+
+# Check data structure
+str(data)
+
+# Convert factors to numeric
+data$JobSatisfaction <- as.numeric(as.character(data$JobSatisfaction))
+
+# Descriptive statistics
+jobRoleTable <- table(data$JobRole)
+jobSatisfactionSummary <- summary(data$JobSatisfaction)
+
+# Descriptive Statistics by Job Role
+job_satisfaction_by_role <- data %>%
+  group_by(JobRole) %>%
+  summarise(
+    Count = n(),
+    Mean = mean(JobSatisfaction, na.rm = TRUE),
+    SD = sd(JobSatisfaction, na.rm = TRUE),
+    Min = min(JobSatisfaction, na.rm = TRUE),
+    Max = max(JobSatisfaction, na.rm = TRUE),
+    Median = median(JobSatisfaction, na.rm = TRUE),
+    IQR = IQR(JobSatisfaction, na.rm = TRUE)
+  )
+job_satisfaction_by_role
+#View(job_satisfaction_by_role)
+
+# Visualization
+ggplot(data, aes(x = JobRole, y = JobSatisfaction, fill = JobRole)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Job Satisfaction Across Different Job Roles", x = "Job Role", y = "Job Satisfaction")
+
+# ANOVA Test
+anova_result <- aov(JobSatisfaction ~ JobRole, data = data)
+anova_summary <- summary(anova_result)
+
+# LM
+lm_model <- lm(JobSatisfaction ~ JobRole + WorkLifeBalance + YearsAtCompany + DistanceFromHome + Age + DailyRate + Gender + JobLevel, data = data)
+summary(lm_model)
+
+```
+
+#Visual analysis indicates that the job roles of Human Resources, Manager, and Research Director have lower than average levels of job satisfaction. However, the output from the linear model reveals that none of these job roles have a statistically significant impact on job satisfaction, as evidenced by p-values all exceeding the typical alpha level of 0.05.
+
+#The residuals of the model, which measure the differences between observed and predicted values of job satisfaction, range from -2.0650 to 1.7337, with a median close to zero. This suggests that the model's predictions are not biased towards overestimating or underestimating job satisfaction.
+
+#Regarding outliers, the range of residuals indicates individual cases where actual job satisfaction is much higher or lower than predicted by the model. Additionally, the model's low multiple R-squared value of 0.02044, indicating that only about 2% of the variability in job satisfaction is explained by all the combined predictors, suggests that job satisfaction is influenced by factors not included in this model.
+
+#The overall F-statistic p-value of 0.6059 confirms that the model does not provide a statistically significant fit to the data, implying that the included variables do not have strong predictive power for job satisfaction. 
+
+#Additional study is recommended to explore other influencing factors.
+
+___
+
+#Build a model to predict employee attrition. The model should achieve at least 60% sensitivity and specificity  (60 each = 120 total) for both the training and validation sets.
+
+```{r}
+#LM model for predict employee attrition
+
+#variables 
+continuous_vars <- c("Age", "DailyRate", "DistanceFromHome", "Education", "HourlyRate", "MonthlyIncome", "MonthlyRate", "NumCompaniesWorked", "PercentSalaryHike", "TotalWorkingYears", "TrainingTimesLastYear", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager")
+
+categorical_vars <- c("BusinessTravel", "Department", "EducationField", "Gender", "JobInvolvement", "JobLevel", "JobRole", "JobSatisfaction", "MaritalStatus", "OverTime", "WorkLifeBalance", "YearsSinceLastPromotion")
+
+
+#LM model with multiple variables
+glmlog_model <- glm(Attrition ~ Age + DailyRate + DistanceFromHome + Education + HourlyRate + MonthlyIncome + MonthlyRate + NumCompaniesWorked + PercentSalaryHike + TotalWorkingYears + TrainingTimesLastYear + YearsAtCompany + YearsInCurrentRole + YearsWithCurrManager + BusinessTravel + Department + EducationField + Gender + JobInvolvement + JobLevel + JobRole + JobSatisfaction + MaritalStatus + OverTime + WorkLifeBalance + YearsSinceLastPromotion, family = "binomial", data = data)
+summary(glmlog_model)
+
+
+# stepwise to narrow down variables
+stepwise_fit <- step(glmlog_model, direction = "both", trace = FALSE)
+summary(stepwise_fit)
+stepwise_fit
+
+#choose variables: OverTime, YearsSinceLastPromotion, JobInvolvement, JobLevel
+final_model <- glm(Attrition ~ OverTime + YearsSinceLastPromotion + JobInvolvement + JobLevel, data = data, family = "binomial")
+summary(final_model)
+
+
+```
+
+#logistic regression model (`glm`) using the binomial family was developed to predict the probability of 'Attrition', utilizing various explanatory variables.
+#Several predictors have been identified as statistically significant (p < 0.05), suggesting they meaningfully contribute to the model in this dataset's context. Statistically significant coefficients were found for 'DistanceFromHome', 'HourlyRate', 'NumCompaniesWorked', 'TrainingTimesLastYear', 'YearsInCurrentRole', 'YearsWithCurrManager', 'BusinessTravel', 'JobInvolvement', 'JobLevel2', 'JobSatisfaction', 'MaritalStatus', 'OverTime', 'WorkLifeBalance', and 'YearsSinceLastPromotion'. These factors are predictive of attrition when controlling for other variables. Further research on these variables is recommended.
+
+#Specifically, 'DistanceFromHome', 'NumCompaniesWorked', and 'OverTimeYes' exhibit positive coefficients, indicating that higher values of these predictors are associated with increased log odds of attrition. Conversely, 'JobSatisfaction' has a negative coefficient, suggesting that higher job satisfaction correlates with lower log odds of attrition. Similarly, higher levels of JobInvolvement (levels 2, 3, and 4) are associated with lower log odds of attrition compared to the baseline level. If focusing on retention, further study of this variable is recommended.
+
+#The model's overall fit is reflected in the AIC value of 551.77. Generally, lower AIC values indicate a better-fitting model, suggesting that this model fits the data better than a model with no predictors.
+
+#The stepwise logistic regression identifies several predictors as significant for the likelihood of attrition. 'DistanceFromHome', 'NumCompaniesWorked', 'TrainingTimesLastYear', 'YearsAtCompany', 'YearsInCurrentRole', and 'YearsWithCurrManager' show a significant relationship with attrition. Higher values of 'DistanceFromHome' and 'NumCompaniesWorked', frequent business travel ('BusinessTravelTravel_Frequently'), and 'OverTimeYes' are linked to increasing the odds of attrition. Marital status plays a role, with 'MaritalStatusSingle' increasing attrition odds compared to the baseline. Gender is also significant, with 'GenderMale' showing a relationship with attrition. Various levels of job involvement ('JobInvolvement2', 'JobInvolvement3', 'JobInvolvement4') and work-life balance ('WorkLifeBalance2', 'WorkLifeBalance3', 'WorkLifeBalance4'), along with years since the last promotion at certain levels ('YearsSinceLastPromotion6', 'YearsSinceLastPromotion7', 'YearsSinceLastPromotion9', 'YearsSinceLastPromotion15'), are identified as significant predictors, all influencing the likelihood of an employee leaving the organization.
+
+#Moreover, higher 'TrainingTimesLastYear' and greater job satisfaction ('JobSatisfaction') lower the odds of attrition.
+
+```{r}
+set.seed(123)
+splitIndex <- createDataPartition(data$Attrition, p = 0.8, list = FALSE)
+train_data <- data[splitIndex, ]
+test_data <- data[-splitIndex, ]
+
+#ran glm, Knn & NB without correcting for imbalance, none were predictive at required level. added code to oversample.
+
+# Calculate the number of 'Yes' and 'No' instances in the training data
+yes_count <- nrow(train_data[train_data$Attrition == "Yes", ])
+no_count <- nrow(train_data[train_data$Attrition == "No", ])
+
+# Determine the desired number of 'Yes' instances after oversampling
+oversampled_yes_count <- yes_count * 5 
+
+# Calculate the desired total size after oversampling
+desired_size <- no_count + oversampled_yes_count
+
+# if ..Apply Oversampling on the Training Set
+if (desired_size > nrow(train_data)) {
+    train_data_balanced <- ovun.sample(Attrition ~ ., data = train_data, method = "over", N = desired_size)$data
+    table(train_data_balanced$Attrition)
+} else {
+    train_data_balanced <- train_data  
+}
+
+# Inspect the first few rows of the balanced dataset
+head(train_data_balanced)
+
+# Convert Attrition to a factor if it's not already
+data$Attrition <- as.factor(data$Attrition)
+
+# Count the number of 'Yes' and 'No' in the Attrition column
+attrition_counts_train <- table(train_data$Attrition)
+# Output the counts
+print(attrition_counts_train)
+
+# Count the number of 'Yes' and 'No' in the Attrition column after oversample
+attrition_counts_balance <- table(train_data_balanced$Attrition)
+
+# Output the counts
+print(attrition_counts_balance)
+```
+
+#LM model using stepwise selected variables
+
+```{r{}}
+# Build the logistic regression model using stepwise selected variables
+#names(train_data) - go through and change from train_data to train_data_balanced for train but not predict
+names(train_data_balanced)
+
+final_model <- glm(Attrition ~ DistanceFromHome + NumCompaniesWorked + BusinessTravel + OverTime, data = train_data_balanced, family = "binomial")
+
+summary(final_model)
+
+# Predict and Evaluate on the test data
+predictions <- predict(final_model, newdata = test_data, type = "response")
+predicted_classes <- ifelse(predictions > 0.5, "Yes", "No")
+predicted_classes <- factor(predicted_classes, levels = c("No", "Yes"))
+
+
+# Evaluate the model
+conf_matrix <- confusionMatrix(predicted_classes, test_data$Attrition)
+conf_matrix 
+
+#CHOOSE THIS MODEL
+#Sensitivity : 0.6781          
+#Specificity : 0.6429 
+
+# Save the logistic regression model to a file
+saveRDS(final_model, "best_model.rds")
+# Load the saved logistic regression model
+#loaded_model <- readRDS("best_model.rds")
+
+```
+
+#before correct for imbalance                              
+Sensitivity : 1.00000         
+Specificity : 0.03571
+#After correct for imbalance 
+Sensitivity : 0.6781          
+Specificity : 0.6429    
+
+```{r}
+
+# KNN Model
+set.seed(123)
+train_control <- trainControl(method = "cv", number = 10)
+knn_model <- train(Attrition ~ OverTime + YearsSinceLastPromotion + JobInvolvement + JobLevel, data = train_data_balanced, method = "knn", trControl = train_control)
+
+
+# Model Evaluation
+predictions_knn <- predict(knn_model, newdata = test_data)
+conf_matrix_knn <- confusionMatrix(predictions_knn, test_data$Attrition)
+conf_matrix_knn
+
+
+```
+
+
+#BEFORE CORRECTING imbalance
+Sensitivity: 0.9726
+Specificity: 0.3571
+
+#AFTER CORRECT IMBALANCE WITH OVERSAMPLING
+Sensitivity: 0.7808
+Specificity: 0.5000
+
+```{r}
+# Naive Bayes Model
+set.seed(123)
+nb_model <- train(Attrition ~ OverTime + YearsSinceLastPromotion + JobInvolvement + JobLevel, data = train_data_balanced, method = "naive_bayes", trControl = train_control)
+
+# Model Evaluation
+predictions_nb <- predict(nb_model, newdata = test_data)
+conf_matrix_nb <- confusionMatrix(predictions_nb, test_data$Attrition)
+conf_matrix_nb
+
+```
+
+#BEFORE CORRECTING imbalance
+Sensitivity: 1.0000 (the model did not predict any 'Yes' cases)
+Specificity: 0.0000 (the model failed to correctly identify any of the 'Yes' cases)
+
+#correct for imbalance 
+Sensitivity : 0.1781          
+Specificity : 0.9286  
+
+```{r}
+#Load the best model (lm)
+loaded_model <- readRDS("best_model.rds")
+
+```
+
+```{r}
+# Data Preprocessing test data -load and preprocess 
+# Load the saved logistic regression model
+loaded_model <- readRDS("best_model.rds")
+
+# Data Preprocessing test data -load and preprocess 
+# Load test data
+comp_data <- read.csv("CaseStudy2CompSet No Attrition.csv")
+
+# List of categorical variables
+categorical_vars <- c("BusinessTravel", "Department", "EducationField", "Gender", "JobInvolvement", "JobLevel", "JobRole", "JobSatisfaction", "MaritalStatus", "OverTime", "WorkLifeBalance", "YearsSinceLastPromotion")
+
+# Apply factor levels to existing variables in test_data
+comp_data[categorical_vars] <- lapply(comp_data[categorical_vars], factor)
+
+str(comp_data[categorical_vars])
+
+# Final structure and summary check for test data
+str(comp_data)
+
+# Predict using the loaded model
+comp_predictions <- predict(loaded_model, newdata = comp_data, type = "response")
+
+# Convert probabilities to class labels (assuming a threshold of 0.5)
+comp_predictions_class <- ifelse(comp_predictions > 0.5, "Yes", "No")
+
+# Create a data frame to save the predictions
+result_df <- data.frame(ID = comp_data$ID, Attrition = comp_predictions_class)
+
+# Write the predictions to a CSV file
+write.csv(result_df, "Case2PredictionsMirzaAttrition.csv", row.names = FALSE)
+
+
+```
+
+
+#Develop a regression model to predict missing monthly incomes in another dataset. The model should achieve a Root Mean Square Error (RMSE) of less than $3000 for both training and validation sets. Validation Requirement for Salary(RMSE < $4000)
+
+
+```{r}
+
+# Read Training Data
+train_data <- read.csv("CaseStudy2-data.csv")
+
+# Data Preprocessing 
+# Convert categorical variables in the training data to factors
+categorical_vars <- c("BusinessTravel", "Department", "EducationField", "Gender", "JobInvolvement", 
+                      "JobLevel", "JobRole", "JobSatisfaction", "MaritalStatus", "OverTime", 
+                      "WorkLifeBalance", "YearsSinceLastPromotion")
+train_data[categorical_vars] <- lapply(train_data[categorical_vars], factor)
+
+# Log-transform the 'MonthlyIncome' variable
+train_data$MonthlyIncome <- log(train_data$MonthlyIncome)
+
+# Check for and remove categorical variables with only one level
+single_level_vars <- sapply(train_data, function(x) length(unique(x)) == 1)
+train_data <- train_data[, !single_level_vars]
+
+# Split the data into training (70%) and validation (30%) sets
+set.seed(123) # For reproducibility
+train_index <- createDataPartition(train_data$MonthlyIncome, p = 0.7, list = FALSE)
+train_set <- train_data[train_index, ]
+validation_set <- train_data[-train_index, ]
+
+# Building a regression model on the training set
+model <- train(MonthlyIncome ~ ., data = train_set, method = "lm", trControl = trainControl(method = "cv", number = 10))
+
+# Evaluate model performance on the validation set
+validation_predictions <- predict(model, newdata = validation_set)
+
+# Reverse the log transformation for predictions and actual values
+predicted_values_validation <- exp(validation_predictions)
+actual_values_validation <- exp(validation_set$MonthlyIncome)
+
+# Calculate RMSE on the original scale
+RMSE_train_original_scale <- sqrt(mean((exp(train_set$MonthlyIncome) - exp(predict(model, newdata = train_set)))^2))
+RMSE_validation_original_scale <- sqrt(mean((actual_values_validation - predicted_values_validation)^2))
+
+# Print RMSE on training and validation sets on the original scale
+cat("RMSE on training data (original scale):", RMSE_train_original_scale, "\n")
+cat("RMSE on validation data (original scale):", RMSE_validation_original_scale, "\n")
+
+# Read the Dataset with Missing Monthly Incomes
+comp_salary_data <- read.csv("CaseStudy2CompSet No Salary.csv")
+
+# Convert categorical variables in this dataset to factors
+comp_salary_data[categorical_vars] <- lapply(comp_salary_data[categorical_vars], factor)
+
+# Apply the model to the competition data
+comp_salary_predictions <- predict(model, newdata = comp_salary_data, type = "raw")
+comp_salary_predictions <- exp(comp_salary_predictions)  # Reverse log transformation
+
+# Create a data frame to save the predictions
+result_df <- data.frame(ID = comp_salary_data$EmployeeNumber, PredictedSalary = comp_salary_predictions)
+
+# Write the predictions to a CSV file
+write.csv(result_df, "Case2PredictionsMirzaSalary.csv", row.names = FALSE)
+
+```
+
+
+
